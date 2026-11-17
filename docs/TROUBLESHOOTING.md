@@ -105,6 +105,25 @@ fresh with the Wi-Fi already up, and you stay signed in. Sign in once more after
 bridge (options A and C), close the app before you turn the TV off (Settings, Apps, the app, Force
 stop).
 
+## Profiling the home (a slow TV)
+
+The home is a web page inside the launcher's WebView. To see what it spends its time on, Chrome's
+DevTools can connect to it over ADB (`chrome://inspect` on a computer with Google's `adb`, or a
+script speaking the DevTools protocol), but a release build keeps that door shut. A computer with
+ADB access can open it without building the app again:
+
+```sh
+TV_IP=<tv address> .venv/bin/python tv-home/tools/tvadb.py shell "settings put global couchtv_webview_debug 1"
+```
+
+The launcher reads the switch when it starts and whenever it makes a new page, so start the home
+again afterwards (Home settings, About, Restart home). It exposes the page only to a computer the TV
+has allowed over ADB; still, switch it off when you are done:
+
+```sh
+TV_IP=<tv address> .venv/bin/python tv-home/tools/tvadb.py shell "settings delete global couchtv_webview_debug"
+```
+
 ## Something else stuck
 
 If the TV no longer asks "Allow USB debugging?", or the home will not go away, see "If something is stuck" in [UNINSTALL.md](UNINSTALL.md). Each TV guide in [the docs index](README.md) has its own limits and fixes, and the open issues often have a fix for your model.
