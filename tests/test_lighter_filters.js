@@ -17,4 +17,5 @@ assert(/html\.lighter \.s-fog \.gclock \.fill \{[^}]*filter: none;[^}]*-webkit-t
 assert(/html\.lighter\.theme-night \.app:not\(\.focus\) \.face img \{ filter: none; opacity: 0\.85; \}/.test(block), 'dock icons that are not focused dim without a filter');
 // the full look keeps its filters
 assert(/^\.night \.scene \.sbg, \.night \.scene \.fg, \.night \.scene \.gclock \{ filter: brightness\(0\.72\); \}/m.test(css), 'the full look still dims with a filter');
+assert(/html\.lighter \.shelf-track, html\.lighter \.tile, html\.lighter \.ncard \{ transition-duration: 80ms; \}/.test(css), 'the focus move lands within a frame or two under Lighter');
 console.log('Lighter home filter tests passed.');
