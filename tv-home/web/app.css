@@ -1066,7 +1066,7 @@ html.lighter .person.focus, html.lighter .people.head.focus, html.lighter.theme-
 html.lighter .qbtn.focus { box-shadow: none; }
 html.lighter .ncard.focus { box-shadow: 0 0 0 0.1875rem #fff; }
 html.lighter.theme-night .app.focus .face { box-shadow: 0 0 0 0.25rem #fff; }
-html.lighter .shelf-track, html.lighter .tile, html.lighter .ncard { transition-duration: 160ms; }
+html.lighter .shelf-track, html.lighter .tile, html.lighter .ncard { transition-duration: 80ms; }   /* a move that lands within a frame or two of the press: at 160 ms the focus always looked a beat behind */
 /* panels that leaned on the blur to stay readable get a darker ground, and no soft shadow, instead */
 html.lighter .settings, html.lighter .smart { background: rgba(10, 8, 12, 0.94); }
 html.lighter .gear-pop, html.lighter .app-pop, html.lighter .people-pop, html.lighter .sleep-menu, html.lighter .qbtn.set { background: rgba(28, 24, 30, 0.97); box-shadow: inset 0 0 0 0.0625rem rgba(255, 220, 230, 0.16); }
