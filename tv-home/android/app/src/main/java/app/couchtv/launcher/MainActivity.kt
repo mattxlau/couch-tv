@@ -93,7 +93,7 @@ class MainActivity : Activity() {
         main.postDelayed({ CrashGuard.settled(this) }, CrashGuard.SETTLE_MS)
         // Lets a computer inspect the page over ADB (chrome://inspect). Only reachable with ADB access.
         // Right after power on the TV's WebView can still be getting ready: never crash over it.
-        runCatching { WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG) }
+        runCatching { WebView.setWebContentsDebuggingEnabled(webDebugWanted()) }
         CrashGuard.install(this)   // the WebView puts its own crash handler in front: ours goes first again
         root = FrameLayout(this).apply { setBackgroundColor(GROUND) }
         setContentView(root)
@@ -345,8 +345,18 @@ class MainActivity : Activity() {
         main.postDelayed({ if (!pageReady) showFallback() }, SLOW_MS)
     }
 
+    /**
+     * Whether the page may be inspected and profiled from a computer (chrome://inspect, the DevTools
+     * protocol). On for a debug build; for a release build only while a computer has set
+     * `settings put global couchtv_webview_debug 1` over ADB (docs/TROUBLESHOOTING.md, "Profiling the
+     * home"), so a slow TV can be measured without building the app again. Off by default.
+     */
+    private fun webDebugWanted(): Boolean = BuildConfig.DEBUG ||
+        runCatching { Settings.Global.getInt(contentResolver, "couchtv_webview_debug", 0) == 1 }.getOrDefault(false)
+
     private fun makeWebView(): WebView = WebView(this).apply {
         setBackgroundColor(GROUND)
+        runCatching { WebView.setWebContentsDebuggingEnabled(webDebugWanted()) }   // read again: the switch may have changed since the last page
         isFocusable = true
         isFocusableInTouchMode = true
         overScrollMode = View.OVER_SCROLL_NEVER
