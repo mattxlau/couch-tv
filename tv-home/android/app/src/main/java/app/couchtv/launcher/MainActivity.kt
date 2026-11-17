@@ -1633,8 +1633,26 @@ class MainActivity : Activity() {
         val d = ri?.let { sharp(pkg, it.activityInfo.iconResource) } ?: ri?.loadIcon(packageManager)
             ?: try { packageManager.getApplicationIcon(pkg) } catch (e: Exception) { return null }
         val bmp = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888)
-        d.setBounds(0, 0, 256, 256)
-        d.draw(Canvas(bmp))
+        val c = Canvas(bmp)
+        // A non-square icon (Prime Video on a Fire TV ships a wide wordmark as its icon) keeps its
+        // shape instead of being squeezed into the square: fitted inside it, centred, the gap in
+        // its own edge colour, the same as drawBanner does for a banner of another shape (#181).
+        val iw = d.intrinsicWidth
+        val ih = d.intrinsicHeight
+        val adaptive = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && d is android.graphics.drawable.AdaptiveIconDrawable
+        if (!adaptive && iw > 0 && ih > 0 && Math.abs(iw.toFloat() / ih - 1f) >= 0.05f) {
+            val w = if (iw > ih) 256 else (256 * iw / ih).coerceAtLeast(1)
+            val h = if (ih > iw) 256 else (256 * ih / iw).coerceAtLeast(1)
+            val src = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            d.setBounds(0, 0, w, h)
+            d.draw(Canvas(src))
+            c.drawColor(src.getPixel(1, h / 2))
+            c.drawBitmap(src, ((256 - w) / 2).toFloat(), ((256 - h) / 2).toFloat(), android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+            src.recycle()
+        } else {
+            d.setBounds(0, 0, 256, 256)
+            d.draw(c)
+        }
         val bytes = ByteArrayOutputStream().also { bmp.compress(Bitmap.CompressFormat.PNG, 100, it); bmp.recycle() }.toByteArray()
         icons[pkg] = bytes
         return bytes
