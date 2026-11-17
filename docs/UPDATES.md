@@ -6,6 +6,9 @@ The newest release is **0.12** (9 November 2026). The TV apps come from [the Rel
 
 ## November 2026
 
+### 17 November 2026: back on the home, the first presses no longer wait (option B; the launcher part needs a build)
+
+A Chromium trace on a Fire TV Cube showed a D-pad press waiting about 6 s for its frame right after every return to the home: the page refreshed twice (the Home button watch's ask, then the launcher's) and each refresh waited, on the page's own thread, for the launcher to rescan every installed app with its label and to read Android's Watch Next rows. The launcher now keeps both ready in the background: the app list is read again only when an app is installed, removed or renamed (or the TV's language changes) and replaces the old one in a single step, and Watch Next is read on a background thread when the home comes back and whenever Android says it changed. The page runs one refresh for the two asks. `tests/test_home_return.js`.
 ### 17 November 2026: a cheaper Look switch, and a steadier hand on the saved copy (option B; the launcher part needs a build)
 
 The Look quick button (and closing Home settings after a change) starts the page again. The settings it had just saved used to go to the bridge on the next load, inside the first refresh, one more round trip before the first picture: they now go in one go before the reload. The page that comes back skips the asks the old one made seconds earlier (who is watching, the quick buttons, what is playing); the regular polls carry on. In the launcher, the look for the bridge on every return to the home, which swapped the live page for a full load of the saved copy on one slow answer (and another full load when the computer answered again a minute later), now waits 20 s after a page load and needs two misses 2 s apart. Seen on a Fire TV Cube over weak Wi-Fi. `tests/test_look_restart.js`.
