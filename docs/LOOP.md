@@ -46,14 +46,18 @@ scripts/make-loop.sh ~/Downloads/lake.mp4
 ```
 
 It writes `tv-home/web/loop/` (git ignores the folder; never commit it), sixteen files:
-`dawn.mp4`, `day.mp4`, `dusk.mp4`, `night.mp4`, a `-blur.mp4` copy of each, and a `.jpg` and
-`-blur.jpg` poster of each. The bridge lists the folder afresh on every read of `config.js` and marks
+`dawn.mp4`, `day.mp4`, `dusk.mp4`, `night.mp4`, a `-blur.mp4` copy of each, a `.jpg` and
+`-blur.jpg` poster of each, and `loop.json` (below). A photo made with `--matte` also has a `-fg.png`
+cut-out of each (the depth effect, below). The bridge lists the folder afresh on every read of `config.js` and marks
 the files with a version the home puts on each address, so no restart: pick the Loop look, or press
 Home to reload it, and the new files play.
 
 Options: `--seconds 45` for a longer loop (15 to 60, default 30), `--slow 2` to slow the clip,
-`--only night` to remake one variant after changing its grade, `--out <dir>` for another folder,
-`--dry-run` to print every ffmpeg command and write nothing. A run takes a few minutes per
+`--only night` to remake one variant after changing its grade (with the same `--seconds` and
+`--matte` as the run that made the others: `loop.json` is one file for all four, so the script refuses
+an `--only` run that would change it), `--out <dir>` for another folder,
+`--matte <image>` for the depth effect (a photo only), `--dry-run` to print every ffmpeg command and the
+`loop.json` it would write, and write nothing. A run takes a few minutes per
 variant on a small computer: the encode is `-preset slow` on purpose, for the smallest file at
 the quality.
 
@@ -75,6 +79,20 @@ What each file is:
 - **The posters**, 960x540 JPEG, the first frame of the sharp and of the blurred file. The home
   shows them until the video plays, and they are the only part of the folder the launcher keeps
   in its offline copy (the video is streamed from the bridge).
+- **`loop.json`**, written once per run: the loop's length and motion, which the bridge passes to the
+  home as `home.loop.meta`. For a photo `{"still": true, "seconds": 34, "fps": 30, "zoom": 0.06,
+  "sway": 0.3, "fg": {"x": 480, "y": 162, "w": 960, "h": 318}}` (`fg` is null without `--matte`), for
+  a clip `{"still": false, "seconds": 30, "fps": 30, "zoom": 0, "sway": 0, "fg": null}`. The bridge
+  ignores a file whose numbers are out of range (seconds 15 to 60, fps 30, zoom 0 to 0.2, sway 0 to
+  1, the rectangle in whole pixels inside 1920x1080), or one without `sway` (the first version's
+  `drift`, a different motion), and says so once in its log.
+
+**Colour.** Every encode is converted to BT.709 limited range (the HD standard) and tagged as such
+(`-colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv`), and the posters to
+JPEG's own BT.601 full range. An untagged file leaves the TV's decoder to guess the matrix, and a guess
+of BT.601 for a BT.709 file moves the colours by a few levels: unseen on its own, but a box around the
+cut-out, whose colours ffmpeg decoded, would show it. Tagged, the TV and ffmpeg turn the same YUV into
+the same RGB.
 
 The video stays on the bridge computer: `scripts/build-apk.sh` leaves `loop/*.mp4` out of the app
 it builds and `scripts/build-standalone.sh` out of the standalone site, the same way the offline
@@ -158,8 +176,8 @@ there.
 ## A photo instead of a clip
 
 `make-loop.sh` takes a photo too (`.jpg`, `.png` or `.webp`, or any file with `--still`): the loop
-becomes a slow push into the picture and back out over its whole length, six percent at most with a
-little sideways drift, eased so the first and the last frame are the same window and the motion is
+becomes a slow push into the picture and back out over its whole length, six percent at most, swaying a
+little sideways, eased so the first and the last frame are the same window and the motion is
 still at both. No seam, no footage to find, and the same four grades, blurred copies and posters. The
 home's own scenes work: `tv-home/web/backgrounds/scene-night@2x.jpg` is the lake peak the design
 mockup used (use the `@2x` file, the push crops into it). On the bridge computer:
@@ -170,3 +188,79 @@ scripts/make-loop.sh tv-home/web/backgrounds/scene-night@2x.jpg --seconds 34
 
 The picture is scaled up four times the output width first so the push moves in quarter pixel
 steps, which takes a few minutes per variant on a small box.
+
+## The depth effect: the clock behind the peak
+
+The original couch-tv design puts the clock behind the mountain: in the Night look, a transparent copy
+of everything in front of the sky (`backgrounds/<scene>-fg.webp`) is drawn over the clock. The Loop look
+does the same for a photo's loop, with one difference: the picture moves (the push and the sway), so a
+still cut-out would slide out of register. It does not need to be still. The motion is a formula, so the
+home moves the cut-out by the same formula, locked to the video's clock.
+
+On the bridge computer, with the scene's own cut-out as the matte:
+
+```
+scripts/make-loop.sh tv-home/web/backgrounds/scene-night@2x.jpg --matte tv-home/web/backgrounds/scene-night-fg@2x.webp --seconds 34
+```
+
+The matte is any image with transparency, aligned with the photo: transparent where the sky is, opaque
+in front of it. For your own photo, step 6 of [MAKE-A-SCENE.md](MAKE-A-SCENE.md) makes one
+(`scene-<id>-fg.webp`). The matte may be smaller than the photo, at the same shape: the script
+scales it to the 1280x720 frame.
+`--matte` is for a photo only: a clip's own motion cannot be followed by a still cut-out, so the script
+refuses it there.
+
+**What the script makes.** For each variant, `<variant>-fg.png`, 640x212 RGBA:
+
+- **Colour:** the finished sharp file's first frame, decoded as BT.709 limited range, so its colours are
+  the video's, grade and all. The first frame is the neutral position: zoompan's zoom
+  `z = 1 + 0.06*(1 - cos(2*PI*on/N))/2` is 1 at `on = 0`, which leaves no room to sway, so the window is
+  the whole picture.
+- **The rectangle:** x 480, y 162, w 960, h 318 on the 1920x1080 screen, around the clock and the peak.
+  Each is a multiple of 3, so on the 1280x720 frame it is x 320, y 108, w 640, h 212 in whole pixels.
+- **Alpha:** the matte scaled to 1280x720, the same crop, multiplied by `min(1, d/24)`, `d` the distance
+  in 720p pixels from the pixel's centre to the nearest crop edge. A sub-pixel mismatch at the crop's
+  border fades in over 24 pixels (36 on the screen) instead of showing as a seam.
+- **The scrim, baked in:** the cut-out is drawn above the scrim, so its colour already carries it:
+  `out = c*(1-a) + ink*a`, ink `#0B0A10` (11, 10, 16), `a = 1 - (1 - top)*(1 - bottom)`, `top` and
+  `bottom` the scrim's two gradients (the same stops as `app.css`) at the row's screen y. A 720p row `Y`
+  of the crop covers screen y `1.5*(Y+108)` to `1.5*(Y+108) + 1.5`, so its centre is
+  `ys = 1.5*(Y+108) + 0.75`. It is one `geq` expression per channel with `st()` and `ld()`, which
+  ffmpeg 7.1 has; `tests/test_make_loop.py` checks it against `app.css`.
+
+The zoom and the sway are two variables in the script (`ZOOM=0.06`, `SWAY=0.3`), used by both
+zoompan and `loop.json`, so the two can never differ. zoompan's window at frame `on` is
+`iw/z` wide from `x = (iw - iw/z)/2 * (1 + 0.3*sin(2*PI*on/N))`: centred, then moved sideways by 0.3 of
+the room the zoom leaves on each side, up to 11 screen pixels. The sway is a share of that room because
+zoompan clamps `x` into it: the first version drifted by 0.6 percent of the width, which asked for more
+room than there was in the first and last 4 s of a 34 s loop, and the video then left the formula by up
+to 2.2 screen pixels, a doubled edge on the spire. zoompan also makes `x` and `y` whole pixels (even ones
+for 4:2:0 input) and the window `int(iw/z)` wide, so the picture goes in as 4:4:4, each expression adds
+0.5 to round, and `x` and `y` add half of what `int()` takes off the window. Simulated over the 1020
+frames of a 34 s loop (`tests/test_make_loop.py` models zoompan's arithmetic), the video stays within
+0.43 screen pixels of the formula at the cut-out's corners and on the peak, where it was 2.7.
+
+**What the home does.** With `home.loop.fg` true (the bridge sets it when `loop.json` has the rectangle
+and every variant has its cut-out), the home puts one image right after the clock, so it covers the
+clock's lower part and stays under the date line and the buttons, at the rectangle, scaled about the
+screen's centre. Its motion is zoompan's mapping in screen space: a point at x `p` at the neutral
+position is at `W/2 + z*(p - W/2) - sway*(z - 1)/2*W*sin(2*PI*t/T)` at loop time `t`, which is
+`translateX(-(sway*(z - 1)/2*100vw)*sin) scale(z)` about the centre. That runs as a CSS animation on the
+compositor (keyframes every 2.5 percent, 0.11 px off at most), started with a delay of minus the video's
+time when the video plays, again at each wrap, after a variant switch and when the home comes back;
+held at 0, the poster's position, while a file loads, and where the frame stopped while the video waits
+for data (a stall leaves the video's `paused` false, so the home goes by `readyState`); hidden while an
+app is in front. While the Ambient music screen is open the cut-out is hidden (it keeps time, so it is
+in place when the screen closes) and the clock and the date line go back up, clear of the album art. The clock and
+the date line move down 80 px with it: the digits run from about y 231 to 405, and the spire, from
+y 350, covers a little of the colon and the inner digits, each still readable. Lighter home keeps it,
+since the video keeps moving.
+
+One approximation: the scrim is fixed to the screen while the cut-out zooms, so at the deepest zoom a
+row of the cut-out sits up to 11 px from where its scrim was baked, about 4 percent of opacity at the
+peak's tip, which the eye does not separate from the picture around it.
+
+**A preview** of the layering on a desktop: serve the repo root and open
+`tv-home/web/index.html?mock=1&look=loop`. The Night look's whole frame cut-out stands over the night
+scene's photo, with no motion (`depth=0` turns it off). It has no scrim baked in, so it looks brighter
+than the TV's.
