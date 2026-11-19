@@ -58,6 +58,20 @@ LOGOS = os.path.join(ROOT, "remote", "src", "app-logos")
 OUT = os.path.join(ROOT, "build", "lg")
 
 
+def web_ignore(*patterns):
+    """shutil.copytree's ignore for tv-home/web: `patterns` anywhere, and the Loop look's folder at
+    the top (loop/, up to 80 MB of footage and stills from scripts/make-loop.sh, git ignored). The
+    LG app reads the loop from the bridge's /tv/loop/, so nothing in it is ever needed here."""
+    by_pattern = shutil.ignore_patterns(*patterns)
+
+    def ignore(folder, names):
+        out = set(by_pattern(folder, names))
+        if os.path.abspath(folder) == os.path.abspath(WEB) and "loop" in names:
+            out.add("loop")
+        return out
+    return ignore
+
+
 def _tar_gz(entries):
     """entries: (name in the archive, bytes or None for a folder). Same order every time."""
     buf = io.BytesIO()
@@ -147,6 +161,19 @@ def css_var_fallbacks(css):
         plain = re.sub(r"var\(--([\w-]+)(?:\s*,[^()]*)?\)", lambda v: consts[v.group(1)], value)
         return f"{prop}: {plain}; {m.group(0)}"
     return re.sub(r"(?<![\w-])([a-z-]+)\s*:\s*([^;{}]*var\(--[^;{}]*)", sub, css)
+
+
+def font_weight_fallbacks(css):
+    """Before Chrome 62 (webOS 3.x and 4.x) font-weight takes only 100, 200 ... 900, so a weight such as
+    620 drops and the heading falls back to regular. Put the nearest hundred (a 50 rounds down) just
+    before it: newer engines still read the exact weight after it."""
+    def sub(m):
+        n = int(m.group(1))
+        if n % 100 == 0 or not 1 <= n <= 1000:
+            return m.group(0)
+        plain = min(900, max(100, (n + 49) // 100 * 100))
+        return f"font-weight: {plain}{m.group(2) or ''}; {m.group(0)}"
+    return re.sub(r"(?<![\w-])font-weight\s*:\s*(\d+)(\s*!important)?(?=\s*[;}])", sub, css)
 
 
 def _plain(name):
@@ -272,7 +299,7 @@ def main():
     skip = ["mock.js", ".*"]
     if (config.HOME or {}).get("hi_res") is False:
         skip.append("*@2x.*")    # home.hi_res false: the 4K copies are never shown, so leave them out
-    shutil.copytree(WEB, stage, ignore=shutil.ignore_patterns(*skip))
+    shutil.copytree(WEB, stage, ignore=web_ignore(*skip))
     for name in os.listdir(os.path.join(HERE, "app")):
         shutil.copy(os.path.join(HERE, "app", name), stage)
     os.makedirs(os.path.join(stage, "logos"))
@@ -288,7 +315,12 @@ def main():
     with open(css_path) as f:
         css = f.read()
     with open(css_path, "w") as f:
-        f.write(css_var_fallbacks(css))
+        f.write(font_weight_fallbacks(css_var_fallbacks(css)))
+    css_path = os.path.join(stage, "widgets.css")
+    with open(css_path, encoding="utf-8") as f:
+        css = f.read()
+    with open(css_path, "w", encoding="utf-8") as f:
+        f.write(font_weight_fallbacks(css))
 
     # index.html: the LG side loads before the bridge settings and app.js
     index = os.path.join(stage, "index.html")

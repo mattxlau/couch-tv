@@ -10,8 +10,8 @@ android {
         applicationId = "dev.couchtv.ontv"
         minSdk = 23          // Android 6.0. Wireless debugging pairing needs Android 11+ on the TV.
         targetSdk = 34
-        versionCode = 12
-        versionName = "0.12"
+        versionCode = 19
+        versionName = "0.13.6"
     }
     buildFeatures { buildConfig = true }
     // Test builds: when COUCHTV_KEYSTORE names a keystore (a debug-style key, alias androiddebugkey,
@@ -31,6 +31,13 @@ android {
             isMinifyEnabled = false
             // Signed with the local debug key so it installs without a keystore. Use your own key to publish.
             signingConfig = signingConfigs.findByName("fixed") ?: signingConfigs.getByName("debug")
+        }
+        // couch-tv-ontv-watch.apk: the release plus the home watch (src/watch/AndroidManifest.xml), for a
+        // computer to install (Fire TV). The plain release has no accessibility service, so Play Protect
+        // lets a phone only install from Downloader through.
+        create("watch") {
+            initWith(getByName("release"))
+            matchingFallbacks += listOf("release")
         }
     }
     compileOptions {
@@ -68,6 +75,10 @@ val copyWeb by tasks.registering(Copy::class) {
     into(layout.projectDirectory.dir("src/main/assets/www"))
     from(remoteDist) { into("remote") }
     from(tvHomeWeb) { into("tv"); exclude("mock.js") }
+    // tv-home/web/loop/: the Loop look's footage and stills (up to 80 MB, scripts/make-loop.sh), git
+    // ignored and only ever shown from the bridge; the on-TV app never uses them, so they stay out.
+    val tvLoop = File(tvHomeWeb, "loop").absoluteFile.normalize()
+    exclude { it.file.absoluteFile.normalize().startsWith(tvLoop) }
     from(file("../../web")) { into("ontv") }
     doFirst {
         if (!File(remoteDist, "index.html").isFile) throw GradleException("No phone remote build at $remoteDist. Run npm run build in remote/ first.")
